@@ -1,26 +1,23 @@
-from cProfile import label
-
 import matplotlib.pyplot as plt
-import  streamlit as st
+import seaborn as sns
+import streamlit as st
 
 from sklearn.metrics import accuracy_score, confusion_matrix
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.neighbors import KNeighborsRegressor
-
+from sklearn.linear_model  import LogisticRegression
 from sklearn.metrics import mean_squared_error ,r2_score
+from sklearn.tree import DecisionTreeClassifier,plot_tree
 
 
 st.title("🌐 Veri Modelleme")
 
 
-# update : güncellemek
-# interpreter : yorumlayıcı
-# spinner : zamanlayıcı
-# number_input
 
-# galiba ortak işlemler için kurdum
+
+# ortak işlemler için kurdum
 def veriIslem(df,selectbox_key = ""):
 
     Sütunlar = df.columns
@@ -57,8 +54,6 @@ def veriIslem(df,selectbox_key = ""):
 
 def KN_eighborsClassifier(bolme,key = "classifier"):
 
-    # result = veriIslem("classifier")
-
     if bolme is None:
         return
 
@@ -78,8 +73,18 @@ def KN_eighborsClassifier(bolme,key = "classifier"):
 
     n_neighbors = st.number_input("n_neighbors - Komşu Sayısı Parametre Değerini Giriniz", min_value=1, step=1, value=3,key=f"number_input_{key}") # tam sayı int dönmesi için ya başına int yazıp paranteze alıcaktık yada buradaki gibi bu 3 parametreyi vericez.
     if n_neighbors is not None:
+
         knn = KNeighborsClassifier(n_neighbors = n_neighbors)
-        knn.fit(X_train,y_train)
+
+        try:
+          knn.fit(X_train,y_train)
+
+        except ValueError:
+
+           st.error("⚠️ Seçtiğiniz hedef değişken sürekli sayısal değerler içeriyor. "
+                "Lütfen sınıflandırma için kategorik bir sütun seçin veya regresyon algoritması kullanın.")
+
+           st.stop()
 
         "---"
         st.markdown(":red[Sonuçların Değerlendirilmesi]:")
@@ -88,8 +93,14 @@ def KN_eighborsClassifier(bolme,key = "classifier"):
         st.write("Doğruluk Oranı: ",accuracy)
 
         confusion_Matrix = confusion_matrix(y_test,y_pred)
-        st.write("Confusion Matrix :")
-        st.write(confusion_Matrix)
+
+        st.write("Confusion Matrix:")
+        fig, ax = plt.subplots()
+        sns.heatmap(confusion_Matrix, annot=True, fmt="d", cmap="magma", ax=ax, cbar=False,linewidths=1, linecolor="black")
+        ax.set_xlabel("Tahmin")
+        ax.set_ylabel("Gerçek")
+        st.pyplot(fig)
+
 
         "---"
         n_Neighbors_Parametre_Degerleri = []
@@ -121,7 +132,6 @@ def KN_eighborsClassifier(bolme,key = "classifier"):
 
 def KN_Regressor(bolme,key ="regressor"):
 
-    #result = veriIslem("regressor")
 
     if bolme is None:
         return
@@ -141,7 +151,21 @@ def KN_Regressor(bolme,key ="regressor"):
 
         st.write("Seçilen Değer : :green[{weight}]")
         knn = KNeighborsRegressor(n_neighbors = n_neighbors , weights = weight)
-        knn.fit(X_train,y_train)
+
+        try:
+
+            knn.fit(X_train,y_train)
+
+        except ValueError:
+
+             st.error("⚠️ Seçtiğiniz hedef değişken kategorik değerler içeriyor. "
+                      "Regresyon algoritmaları sürekli (sayısal) hedef değişkenler için uygundur. "
+                      "Lütfen regresyon yerine sınıflandırma algoritması seçiniz.")
+
+             st.stop()
+
+
+
         y_pred = knn.predict(X_test)
 
         mse = mean_squared_error(y_test,y_pred)
@@ -167,30 +191,155 @@ def KN_Regressor(bolme,key ="regressor"):
         st.pyplot(plt)
 
 
-# def Locistic_Regression():
+def Locistic_Regression(bolme):
+
+    if bolme is None:
+        return
+
+    X_train, X_test, y_train, y_test = bolme
+
+    c =  st.number_input("Regularizasyon Katsayısı (C)" , min_value= 0.01,max_value=10.0,value=1.0,step=0.01)
+    max_iter =  st.number_input("Maksimum İterasyon Sayısı" , min_value=50,max_value=1000,value=100,step = 10)
+
+
+
+    log_regression = LogisticRegression(  penalty="l2",
+                                          C=c,
+                                          solver="lbfgs",
+                                          max_iter = max_iter
+    )
+
+    try:
+
+       log_regression.fit(X_train,y_train)
+
+    except ValueError:
+        st.error("⚠️ Seçtiğiniz hedef değişken sürekli sayısal değerler içeriyor. "
+                     "Lütfen sınıflandırma için kategorik bir sütun seçin veya regresyon algoritması kullanın.")
+
+
+        # st.stop()
+
+    accuracy = log_regression.score(X_test,y_test)
+
+    st.write(f"Logistic Regression Doğruluk Oranı: :blue[{accuracy:.4f}]")
+
+
+
+    y_pred = log_regression.predict(X_test)
+    cm = confusion_matrix(y_test, y_pred)
+
+    st.write("Confusion Matrix:")
+    fig, ax = plt.subplots()
+    sns.heatmap(cm, annot=True, fmt="d", cmap="cividis", ax=ax,linewidths=1, linecolor="black")
+    ax.set_xlabel("Tahmin")
+    ax.set_ylabel("Gerçek")
+    st.pyplot(fig)
 
 
 
 
+
+def Decision_Tree(bolme):
+
+    if bolme is None:
+        return
+
+    X_train, X_test, y_train, y_test = bolme
+
+    criterion = st.selectbox("Bölme Kriteri (criterion):" , ["gini","entropy"])
+    max_depth = st.number_input("Maksimum Derinlik (max_depth):",min_value=1 , max_value=20 , value = 5 , step =1)
+
+    tree_clf = DecisionTreeClassifier(criterion=criterion,
+                                      max_depth=max_depth,
+                                      random_state=42
+
+    )
+
+
+    try:
+       tree_clf.fit(X_train,y_train)
+
+    except ValueError:
+        st.error("⚠️ Seçtiğiniz hedef değişken sürekli sayısal değerler içeriyor. "
+                     "Lütfen sınıflandırma için kategorik bir sütun seçin veya regresyon algoritması kullanın.")
+
+        st.stop()
+
+
+    y_pred = tree_clf.predict(X_test)
+    accuracy = accuracy_score(y_test,y_pred)
+
+
+    conf_matrix = confusion_matrix(y_test,y_pred)
+    st.write("Confusion Matrix:")
+
+
+    fig, ax = plt.subplots()
+    sns.heatmap(conf_matrix, annot=True, fmt="d", cmap="coolwarm", ax=ax, cbar=True,
+                linewidths=1, linecolor="black")  # kutucuklara çizgi ekleme
+    ax.set_xlabel("Tahmin")
+    ax.set_ylabel("Gerçek")
+    st.pyplot(fig)
+
+
+    plt.figure(figsize=(35,18),dpi=100)
+
+    # plot_tree(tree_clf,filled=True,feature_names=df.columns,class_names=list(target.columns)) # → burada df ve target Decision_Tree fonksiyonuna parametre olarak gelmiyor. Bu hata veriyor. Onu boyle yapabtık:
+    plot_tree(tree_clf , filled=True , feature_names=X_train.columns , class_names=[str(cls) for cls in y_train.unique()],fontsize=10, rounded=True)
+
+    st.pyplot(plt)
+
+
+
+    feature_importances = tree_clf.feature_importances_
+    feature_names = X_train.columns
+    feature_importances_sorted = sorted(zip(feature_importances,feature_names),reverse=True)
+
+    "---"
+    st.write(":red[Ozellik Onem Skorları (Sıralı) :]")
+
+    for importance , feature_name in feature_importances_sorted:
+        st.write(f"{feature_name } : :blue[{importance}]")
 
 
 
 
 def ML_Secım():
 
-    secim = st.multiselect(" :red[ML Algoritmasını Seçiniz :]",["KNeighborsClassifier","KNRegressor"])
+    if bolme is None:
+        return
 
-    if "KNeighborsClassifier" in secim:
+    X_train, X_test, y_train, y_test = bolme
 
-        with st.expander("KNeighborsClassifier"):
+    # Eğer hedef sütun kategorikse (az unique değer, int/string gibi)
+    if y_train.dtype == 'object' or y_train.nunique() < 20:
+            secim = st.multiselect(" :red[Sınıflandırma Algoritmasını Seçiniz :]",["KNeighborsClassifier","KNRegressor","Locistic_Regression","Decision_Tree"])
 
-            KN_eighborsClassifier(bolme)
+            if "KNeighborsClassifier" in secim:
+                 with st.expander("KNeighborsClassifier"):
+                      KN_eighborsClassifier(bolme)
 
-    if "KNRegressor" in secim:
 
-        with st.expander("KNRegressor"):
+            if "Decision_Tree" in secim:
+                 with st.expander("Decision_Tree"):
+                     Decision_Tree(bolme)
 
-            KN_Regressor(bolme)
+
+            if "Locistic_Regression" in secim:
+                 with st.expander("Locistic_Regression"):
+                     Locistic_Regression(bolme)
+
+
+
+    else : # sürekli sayısal değerler için regresyon
+
+            secim = st.multiselect("Regresyon Algoritmasını Seciniz:",["KNRegressor"])
+
+            if "KNRegressor" in secim:
+                with st.expander("KNRegressor"):
+                    KN_Regressor(bolme)
+
 
 
 try:
@@ -210,21 +359,14 @@ try:
         bolme = veriIslem(df,"shared")  # veriIslem sadece burada çağrılır
 
 
-        # bence kullanıcı multi seçim yapsın seçtikleri expendar da görülsün oluşturulsun
-
         ML_Secım()
 
-        #KN_eighborsClassifier(bolme)
-        #KN_Regressor(bolme)
 
     else:
+
         st.warning("⚠️Dosya Yüklenmedi ! Lütfen Veri Önizleme Kısmından Dosyanızı Yükleyiniz.")
 
 except Exception as e:
-    st.write(":green[Yakalanan Hata]: ",e)
 
+       st.write(":green[Yakalanan Hata]: ",e)
 
-#  dökümantasyonda metrik kısmında ornek 4 de ızgara kısmını makine öğrenmesi için doğruluk oranı
-
-
-# ÖNCE ML ALGORİTMASINI SEÇSİN SONRA EXPLANDERDA PARAMETRES SORSUN
