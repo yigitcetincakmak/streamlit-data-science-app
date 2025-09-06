@@ -94,7 +94,7 @@ def KN_eighborsClassifier(bolme,key = "classifier"):
 
         confusion_Matrix = confusion_matrix(y_test,y_pred)
 
-        st.write("Confusion Matrix:")
+        st.write(":blue[Confusion Matrix:]")
         fig, ax = plt.subplots()
         sns.heatmap(confusion_Matrix, annot=True, fmt="d", cmap="magma", ax=ax, cbar=False,linewidths=1, linecolor="black")
         ax.set_xlabel("Tahmin")
@@ -136,59 +136,88 @@ def KN_Regressor(bolme,key ="regressor"):
     if bolme is None:
         return
 
-    X_train, X_test, y_train, y_test = bolme   #result
+    X_train, X_test, y_train, y_test = bolme
 
     scaler_izin = st.toggle("Veriyi Ölçeklendir (Scaler)",key=f"toggle_{key}")
+
+    feature_names = X_train.columns
+
     if scaler_izin:
         scaler = StandardScaler()
-        X_train = scaler.fit_transform(X_train)
+        X_train = scaler.fit_transform(X_train) # StandardScaler, numpy array döndürür.(bu Yüzden hata aldık - bizde features names adında değişken oluşturup kolon isimlerini scaler'dan önce sakladık)
         X_test = scaler.transform(X_test)
 
     n_neighbors = st.number_input("n_neighbors - Komşu Sayısı Parametre Değerini Giriniz", min_value=1, step=1,value=3,key=f"number_input{key}")  # tam sayı int dönmesi için ya başına int yazıp paranteze alıcaktık yada buradaki gibi bu 3 parametreyi vericez.
-    weight = st.radio("weight Parametresini seçiniz :",["uniform","distance"])
-
-    if n_neighbors and weight is not None:
-
-        st.write("Seçilen Değer : :green[{weight}]")
-        knn = KNeighborsRegressor(n_neighbors = n_neighbors , weights = weight)
-
-        try:
-
-            knn.fit(X_train,y_train)
-
-        except ValueError:
-
-             st.error("⚠️ Seçtiğiniz hedef değişken kategorik değerler içeriyor. "
-                      "Regresyon algoritmaları sürekli (sayısal) hedef değişkenler için uygundur. "
-                      "Lütfen regresyon yerine sınıflandırma algoritması seçiniz.")
-
-             st.stop()
 
 
+    # Özellik seçimi yapıyoruz
+    feature = st.selectbox("Tahmin için kullanılacak ozelligi seciniz :", feature_names)
+    "---"
 
-        y_pred = knn.predict(X_test)
+    # DataFrame değil numpy array olduğundan ilgilş kolonu bu şekilde almamız gerekti
 
-        mse = mean_squared_error(y_test,y_pred)
-        r2 = r2_score(y_test,y_pred)
+    column_index = list(feature_names).index(feature)
 
-        st.write(f"Mean Squared Error Değeri :  :blue[{mse:.2f}]")
-        st.write(f"r² Skor Değeri : :blue[{r2:.2f}]") # Alt + 0178 kare üssü 2 yapıyor # rainbow -- blue yerine olabilir
-        "---"
+    # DataFrame mi, NumPy array mi kontrol et (has attribute(hasattr) ---> özelliğe sahip mi fonksiyonu ile  hasattr(obj, "attr") --- obj nesnesi attr adlı özelliğe sahip mi  ---> True / False)
 
-        for i , weight in enumerate(["uniform","distance"]):
+    # DataFrame ise
+    if hasattr(X_train, "iloc"): # has attribute pythonda bulunan yerleşik bir fonksiyon
+
+        X_train_single = X_train.iloc[:, [column_index]]
+        X_test_single = X_test.iloc[:, [column_index]]
+
+    # NumPy array ise
+    else:
+
+        X_train_single = X_train[:, [column_index]]
+        X_test_single = X_test[:, [column_index]]
+
+
+    for i , weight in enumerate(["uniform","distance"]):
+
             knn = KNeighborsRegressor(n_neighbors=n_neighbors, weights=weight)
-            knn.fit(X_train, y_train)
-            y_pred = knn.predict(X_test)
+
+            try:
+
+                knn.fit(X_train_single, y_train)
+
+            except ValueError:
+
+                st.error("⚠️ Seçtiğiniz hedef değişken kategorik değerler içeriyor. "
+                         "Regresyon algoritmaları sürekli (sayısal) hedef değişkenler için uygundur. "
+                         "Lütfen regresyon yerine sınıflandırma algoritması seçiniz.")
+                st.stop()
+
+
+            y_pred = knn.predict(X_test_single)
+
+            # Skorları hesaplama
+            mse = mean_squared_error(y_test, y_pred)
+            r2 = r2_score(y_test, y_pred)
+
+
+            st.write(f"Weight = :green[{weight}]  için sonuçlar:")
+            st.write(f"• Mean Squared Error : :blue[{mse:.2f}]")
+            st.write(f"• r² Skor : :blue[{r2:.2f}]")
+            "---"
+
+
 
             plt.subplot(2,1,i+1) # 2 satır 1 sütundan oluşan , ve galiba 1.çiziyorum ... gibi
-            plt.scatter(X_train,y_train,color = "black",label="veri")
-            plt.plot(X_test,y_pred,color = "red" , label ="tahmin")
+
+            plt.scatter(X_train_single,y_train,color = "black",label="veri")
+            plt.plot(X_test_single,y_pred,color = "red" , label ="tahmin")
             plt.axis("tight")
             plt.legend()
             plt.title(f"KNN Regressor weight = {weight}")
 
-        plt.tight_layout()
-        st.pyplot(plt)
+
+    plt.tight_layout()
+    st.pyplot(plt)
+
+
+# weight parametresinin kullanımı mantık hatası var kullanıcı seçimini eziyoruz (for içinde seçim yapılmadan 2 parametreyiyede ayrı ayrı değerlendirelim)
+
 
 
 def Locistic_Regression(bolme):
@@ -218,7 +247,7 @@ def Locistic_Regression(bolme):
                      "Lütfen sınıflandırma için kategorik bir sütun seçin veya regresyon algoritması kullanın.")
 
 
-        # st.stop()
+        st.stop()
 
     accuracy = log_regression.score(X_test,y_test)
 
@@ -229,7 +258,7 @@ def Locistic_Regression(bolme):
     y_pred = log_regression.predict(X_test)
     cm = confusion_matrix(y_test, y_pred)
 
-    st.write("Confusion Matrix:")
+    st.write(":green[Confusion Matrix:]")
     fig, ax = plt.subplots()
     sns.heatmap(cm, annot=True, fmt="d", cmap="cividis", ax=ax,linewidths=1, linecolor="black")
     ax.set_xlabel("Tahmin")
@@ -272,7 +301,7 @@ def Decision_Tree(bolme):
 
 
     conf_matrix = confusion_matrix(y_test,y_pred)
-    st.write("Confusion Matrix:")
+    st.write(":green[Confusion Matrix:]")
 
 
     fig, ax = plt.subplots()
@@ -283,10 +312,15 @@ def Decision_Tree(bolme):
     st.pyplot(fig)
 
 
-    plt.figure(figsize=(35,18),dpi=100)
+    # Kullanıcıdan input al
+    fig_width = st.number_input("Ağaç Görselleştirme Genişliği", min_value=5, max_value=50, value=40, step=1)
+    fig_height = st.number_input("Ağaç Görselleştirme Yüksekliği", min_value=5, max_value=50, value=20, step=1)
+    font_size = st.number_input("Font Boyutu", min_value=6, max_value=20, value=10, step=1)
+
+    plt.figure(figsize=(fig_width,fig_height),dpi=100)
 
     # plot_tree(tree_clf,filled=True,feature_names=df.columns,class_names=list(target.columns)) # → burada df ve target Decision_Tree fonksiyonuna parametre olarak gelmiyor. Bu hata veriyor. Onu boyle yapabtık:
-    plot_tree(tree_clf , filled=True , feature_names=X_train.columns , class_names=[str(cls) for cls in y_train.unique()],fontsize=10, rounded=True)
+    plot_tree(tree_clf , filled=True , feature_names=X_train.columns , class_names=[str(cls) for cls in y_train.unique()],fontsize=font_size, rounded=True)
 
     st.pyplot(plt)
 
