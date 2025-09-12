@@ -11,6 +11,21 @@ import matplotlib.pyplot as plt
 
 #Scatterplot
 
+
+# Giriş kontrolü
+if "login" not in st.session_state or not st.session_state["login"]:
+    st.error("Bu sayfaya erişmek için giriş yapmalısınız!")
+    st.stop()  # Sayfanın geri kalanını göstermeyi durdurur
+
+# Eğer giriş yapılmışsa devam
+st.info(f"✨ Hoşgeldiniz | {st.session_state['user_email']} 🚀")
+
+
+
+
+
+
+
 def grafikCizim(sütun1,sütun2):
 
     with st.expander("Çubuk Grafik"):

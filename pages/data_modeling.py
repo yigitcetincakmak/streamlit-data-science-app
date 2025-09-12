@@ -12,6 +12,22 @@ from sklearn.metrics import mean_squared_error ,r2_score
 from sklearn.tree import DecisionTreeClassifier,plot_tree
 
 
+
+# giriş kontrolü
+
+if "login" not in st.session_state or not st.session_state["login"]:
+    st.error("Bu sayfaya erişmek için giriş yapmalısınız!")
+    st.stop()  # Sayfanın geri kalanını göstermeyi durdurur
+
+# eğer zaten giriş yapılmışsa
+
+st.info(f"✨ Hoşgeldiniz|{st.session_state['user_email']} 🚀")
+
+
+
+
+
+
 st.title("🌐 Veri Modelleme")
 
 
@@ -220,7 +236,7 @@ def KN_Regressor(bolme,key ="regressor"):
 
 
 
-def Locistic_Regression(bolme):
+def Logistic_Regression(bolme):
 
     if bolme is None:
         return
@@ -348,7 +364,7 @@ def ML_Secım():
 
     # Eğer hedef sütun kategorikse (az unique değer, int/string gibi)
     if y_train.dtype == 'object' or y_train.nunique() < 20:
-            secim = st.multiselect(" :red[Sınıflandırma Algoritmasını Seçiniz :]",["KNeighborsClassifier","KNRegressor","Locistic_Regression","Decision_Tree"])
+            secim = st.multiselect(" :red[Sınıflandırma Algoritmasını Seçiniz :]",["KNeighborsClassifier","KNRegressor","Logistic_Regression","Decision_Tree"])
 
             if "KNeighborsClassifier" in secim:
                  with st.expander("KNeighborsClassifier"):
@@ -360,9 +376,9 @@ def ML_Secım():
                      Decision_Tree(bolme)
 
 
-            if "Locistic_Regression" in secim:
-                 with st.expander("Locistic_Regression"):
-                     Locistic_Regression(bolme)
+            if "Logistic_Regression" in secim:
+                 with st.expander("Logistic_Regression"):
+                     Logistic_Regression(bolme)
 
 
 
