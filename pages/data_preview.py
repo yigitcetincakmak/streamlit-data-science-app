@@ -98,6 +98,64 @@ def veri_ayiklama_ve_gosterim(placeholder, df, dosya_adi):
 
 
 
+def gruplama_yap_ve_analiz_et(df):
+
+    st.write("---")
+    st.title("📊 Veri Gruplama")
+    st.write("---")
+
+    kolonlar = df.columns.tolist() # dataframe'in içindeki tüm kolon isimlerini alır ve bunları bi liste olarak kaydedediyoruz (selectbox ta liste olarak parametre veriyoruz).
+
+    # kullanıcının bu seçeneklerden bir sütun seçmesi isteniyor.
+    gruplama_sutunu = st.selectbox(
+        "Lütfen gruplama yapmak istediğiniz sütunu seçin:",
+        options=["Seçim yapın"] + kolonlar
+    )
+
+
+    if gruplama_sutunu != "Seçim yapın":
+
+        try:
+
+            # Seçilen sütuna göre gruplama yap ve sayısal sütunların özetini çıkar
+            gruplu_veri = df.groupby(gruplama_sutunu).agg(['count', 'mean', 'sum']).reset_index()
+
+        # bu, dataframe'i (df) belirtilen sütundaki (gruplama_sutunu) değerlere göre gruplara ayırıyoruz.
+        # gruplanmış her bir veri grubu üzerindeki sayısal sütunlara ayrı ayrı belirtilen toplama (aggregation) fonksiyonlarını uyguluyoruz.
+        # gruplama işlemini yaptıktan sonra varsayılan olarak indeks haline gelen gruplama_sutunu'nu tekrar normal bir sütun haline getiriyoruz.
+
+
+            st.write(f"**'{gruplama_sutunu}'** Sütununa Göre Gruplanmış Verilerin Özeti:")
+            st.dataframe(gruplu_veri)
+
+        except Exception as e:
+            st.error(f"Gruplama işlemi sırasında bir hata oluştu: {e}")
+            st.info("Sadece sayısal veriler gruplanabilir. Lütfen farklı bir sütun seçin.")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # --- Streamlit Arayüzümüz ---
