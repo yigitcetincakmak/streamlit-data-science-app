@@ -1,6 +1,7 @@
 import pandas as pd
 import streamlit as st
 
+import io
 
 
 
@@ -137,22 +138,138 @@ def gruplama_yap_ve_analiz_et(df):
 
 
 
+def eksik_degerleri_doldur_ve_indir(df, dosya_adi):
+
+
+    st.write("---")
+    st.title("📝 Eksik Değerleri Doldur")
+    st.write("---")
+
+    # bu satırda amaçladığımız boş hücre içeren sütunları bulmak
+    bos_hucre_sutunlari = df.columns[df.isnull().any()].tolist()
+    # burada df.isnull() bir boolean (true-false) dataframe oluşturuyor. hücre boşsa (nan ise) true, doluysa false değerini veriyor.
+    # .any() ise elde edilen boolean dataframe'i alır ve her bir sütunda en az bir tane true (yani en az bir boş hücre) olup olmadığını kontrol eder ve bir series oluşturur.
+    # .tolist() ise eksik değer içeren sütun isimlerini bir liste haline getiriyoruz ve bos_hucre_sutunlari değişkenine atıyoruz.
+
+
+
+    # eğer "bos_hucre_sutunlari" isimli listemiz boşsa
+    if not bos_hucre_sutunlari:
+        st.info("✅ Dosyada boş hücre bulunmamaktadır.")
+        return
+
+    # burada kullanıcayı açılır bir menü,selectbox gösteriyoruz kullanıcı boş hücre bulunan sütunlardan birini seçer
+    kolon = st.selectbox(
+        "Boş hücreleri doldurmak istediğiniz sütunu seçin:",
+        options=bos_hucre_sutunlari
+    )
+
+    # burada kullanıcıya boş hücreleri doldurması için  3 klasik seçenek sunuyoruz
+    doldurma_yontemi = st.radio(
+        "Doldurma Yöntemi:",
+        ("Ortalama ile doldur", "Medyan ile doldur", "Belirli bir değer ile doldur")
+    )
+
+
+
+    # burda doldurulacak_deger değişkeni none , bir doldurma yöntemi seçilmezse bir değer atanmamış olur
+    doldurulacak_deger = None
+
+    # eğer kullanıcı ortalama ile doldur seçeneğini seçerse bu blok çalışıcak.
+    if doldurma_yontemi == "Ortalama ile doldur":
+
+        if pd.api.types.is_numeric_dtype(df[kolon]): # burada true - false şeklinde bir sonuç çıkacak ---> seçilen sütunun sayısal bir veri tipi (integer,float) olup olmadığını kontrol eder sayısal ise true der ve if blok içine girer değilse false else blok içine girer.
+            doldurulacak_deger = df[kolon].mean() # seçilen sütunun ortalamasını alır
+            st.info(f"Boş hücreler, '{kolon}' sütununun ortalaması olan **{doldurulacak_deger:.2f}** ile doldurulacak.")
+        else:
+            st.warning("Seçilen sütun sayısal değil, ortalama ile doldurma uygulanamaz.")
+            return
+
+
+    # eğer kullanıcı Medyan ile doldur seçeneğini seçerse bu blok çalışıcak.
+    elif doldurma_yontemi == "Medyan ile doldur":
+
+        if pd.api.types.is_numeric_dtype(df[kolon]):
+            doldurulacak_deger = df[kolon].median()
+            st.info(f"Boş hücreler, '{kolon}' sütununun medyanı olan **{doldurulacak_deger:.2f}** ile doldurulacak.")
+        else:
+            st.warning("Seçilen sütun sayısal değil, medyan ile doldurma uygulanamaz.")
+            return
+
+
+    # eğer kullanıcı Belirli bir değer ile doldur seçeneğini seçerse bu blok çalışıcak.
+    elif doldurma_yontemi == "Belirli bir değer ile doldur":
+
+        doldurulacak_deger = st.text_input("Lütfen boş hücreleri doldurmak için bir değer girin:")
+        if not doldurulacak_deger: # kullanıcı bir değer girmesse
+            return # fonksiyon durdurulur
 
 
 
 
+    # şimdi burada eksik değerleri doldur butonuna tıklanırsa
+    if st.button("Eksik Değerleri Doldur"):
+        # orijinal bulunan dataframe'in bir kopyasını oluşturarak işlem yapıyoruz orijinali korumak , zarar vermemek için
+        df_guncel = df.copy()
+
+        try:
+            # eğer kullanıcı belirli bir değer ile doldur seçeneğini seçtiyse bizim text_input tan aldığımız değer o sütunun hedef sütunun veri tipine uygun hale getirmeye çalışıyoruz.
+            if doldurma_yontemi == "Belirli bir değer ile doldur":
+                if pd.api.types.is_numeric_dtype(df_guncel[kolon]): # eğer kolon sayısal bir veri tipindeyse (boş hücrelerini dolduracağımız kolon)
+                    doldurulacak_deger = pd.to_numeric(doldurulacak_deger)  # gelen değeri sayısal veri tipine dönüştürüyor
+                else:
+                    doldurulacak_deger = str(doldurulacak_deger) # sayısal değilse string veri tipine dönüştürüyor
+
+            df_guncel[kolon] = df_guncel[kolon].fillna(doldurulacak_deger) # .fillna() metodu ile doldurma işlemi gerçekleştiriliyor
+            st.session_state["veri"] = df_guncel # df guncel dosyamız session_state içine kaydedilerek artık bu dosya ile çalışılması sağlanıyor
+            st.success("✅ Eksik değerler başarıyla dolduruldu!")
+
+        # try bloğu içerisinde hata oluşması sonucu çalışır
+        except ValueError:
+            st.error("Girdiğiniz değer, seçilen sütunun veri tipiyle uyumlu değil.")
 
 
+        # ---> bu kısım dosya indirme işlemini ayarladığımız kısmımız
+
+        if "veri" in st.session_state:
+            st.write("---")
+            st.subheader("📥 Dosyayı İndir")
 
 
+            uzanti = dosya_adi.split('.')[-1] # burada yüklediğimiz orijinal dosyanın uzantısını kontrol ediyoruz(csv mi xlsx mi)
+                                # burada dosya adını nokta karakterinde ayırıyor ve bir liste oluşturuyor , sonrada bu listesin son elamanını alyor ve bunu uzantı değişkenimize atıyoruz
+                                    # mesela dosya adı "verilerim.xlsx"  noktadan ayırıyor liste oluşturuyor----> ["verilerim","xlsx"] ---> burada tersten index okursak -1 den başlıyor bizde onu alıyoruz
 
+            # eğer dosya uzantımız csv ise to_csv() ile UTF-8 kodlamasında hazırlanıyor
+            if uzanti == 'csv':
+                cikti = st.session_state["veri"].to_csv(index=False).encode('utf-8')
+                mime_type = 'text/csv'  # mime type burada text-csv yani metin/virgülle ayrılmış değerler, ---> tarayıcıya dosyanın türünü bildiren kimlik kartıdır.
+                indirme_adi = f"guncellenmis_{dosya_adi}"
 
+            # eğer dosya uzantımız xlsx ise io.BytesIO kullanılarak excel formatında bellek içinde hazırlanır.bu streamlit'e excel verisini indirme yeteneği kazandırmak için gereken python yöntemidir
+            elif uzanti == 'xlsx':
 
+                excel_cikti = io.BytesIO()
+                st.session_state["veri"].to_excel(excel_cikti, index=False)
+                excel_cikti.seek(0) # io.BytesIO ile bir dosya oluşturulduğunda, veriyi yazma işlemi imleci dosyanın sonuna taşıyor seek(0) ile İmleci 0.(sıfırıncı) pozisyona (yani dosyanın başlangıcına) geri taşıyoruz.
+                                                        # ---> Eğer bu yapılmazsa, bir sonraki okuma/alma (.getvalue()) komutu dosyanın sonundan başlar ve boş bir dosya veya eksik veri indirilir.
 
+                cikti = excel_cikti.getvalue()  # burada bellekte oluşturulan excel verisini (BytesIO nesnesi) streamlit in st.download_button'una verebileceğimiz formata dönüştürüyor yani ---> uygun olan ham bayt dizisi (bytes) formatına dönüştürüyor.
+                mime_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'  # mime type, tarayıcıya dosyanın türünü bildiren kimlik kartıdır. burada mıme type değişkenine yazdığımız atadığımız ise ---> tarayıcının indirdiği dosyanın bir Excel (2007 ve sonrası) belgesi olduğunu anlamasını sağlayan resmi ve uzun mime tipidir.
+                indirme_adi = f"guncellenmis_{dosya_adi}"
 
+            else:
 
+                return
 
-
+            # hazırlanan verimiz(data=cikti) belirlenen dosya adı ve mime_type ile birlikte kullanıcıya sunulur , butona tıklandığında tarayıcı dosyayı kullanıcın diskine indirir
+            st.download_button(
+                label="Güncellenmiş Dosyayı İndir",
+                data=cikti,
+                file_name=indirme_adi,
+                mime=mime_type # dosya sunucularında ve tarayıcılarda dosya türünü tanımlamak için mıme type ı kullanıyoruz
+            )
+            st.info("Dosyayı indirmek için yukarıdaki butona tıklayın.")
 
 
 
@@ -199,6 +316,7 @@ if dosya:
 
 
 
+# Eğer session_state te bir veri varsa onu placeholder da göster
 if "veri" in st.session_state and st.session_state["veri"] is not None:
 
     #"veri" in st.session_state → bu kısım oturumda "veri" anahtarı var mı?
@@ -213,6 +331,10 @@ if "veri" in st.session_state and st.session_state["veri"] is not None:
     # Eski içeriği silmek ve yeni içeriği yerleştirmek için placeholderı kullanıyoruz.
 
     veri_ayiklama_ve_gosterim(placeholder, st.session_state["veri"], st.session_state["dosya_adi"])  # veri_ayiklama_ve_gosterim fonksiyonunu çağırıyoruz
+
+    gruplama_yap_ve_analiz_et(st.session_state["veri"])
+
+    eksik_degerleri_doldur_ve_indir(st.session_state["veri"], st.session_state["dosya_adi"])  # eksik_degerleri_doldur_ve_indir fonksiyonunu çağırıyoruz
 
 
 else:
